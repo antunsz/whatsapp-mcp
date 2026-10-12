@@ -162,7 +162,7 @@ By default, just the metadata of the media is stored in the local database. The 
 
 ## Voice-note transcription
 
-`transcribe_audio` turns a voice note into text with macOS's on-device speech recognizer (SpeechAnalyzer, macOS 26 or later), so the audio never leaves your Mac and there is nothing to pay or install beyond the Xcode command line tools. The recognizer is only reachable from Swift: `whatsapp-mcp-server/transcribe.swift` is compiled into `whatsapp-mcp-server/bin/transcribe` on first use, which takes a second or two. A minute of audio takes about a second to transcribe.
+`transcribe_audio` turns a voice note into text with macOS's on-device speech recognizer (SpeechAnalyzer, macOS 26 or later), so the audio never leaves your Mac and there is nothing to pay or install beyond the Xcode command line tools. macOS cannot read some of WhatsApp's Ogg files, and those are converted to WAV with ffmpeg (already needed to send audio) and transcribed again. The recognizer is only reachable from Swift: `whatsapp-mcp-server/transcribe.swift` is compiled into `whatsapp-mcp-server/bin/transcribe` on first use, which takes a second or two. A minute of audio takes about a second to transcribe.
 
 Transcriptions are cached in a `transcriptions` table in `messages.db`, and message lists then show `[audio, transcribed - ...]` followed by the text instead of the bare `[audio - ...]` placeholder. They go through the prompt-injection guard like any other message, since an injection can be spoken as easily as typed. Older audios may fail to download once WhatsApp drops them from its servers.
 

@@ -54,6 +54,22 @@ def test_transcribes_speech_on_device(spoken_injection):
 
 
 @macos_speech
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="needs ffmpeg")
+def test_retries_as_wav_when_macos_cannot_read_the_file(spoken_injection, monkeypatch):
+    real_run, attempts = transcription._run, []
+
+    def picky_run(path):
+        attempts.append(path)
+        if not path.endswith(".wav"):
+            raise RuntimeError("nilError")  # what macOS reports for some WhatsApp Ogg files
+        return real_run(path)
+
+    monkeypatch.setattr(transcription, "_run", picky_run)
+    assert "instruções anteriores" in transcription.transcribe_file(spoken_injection)
+    assert len(attempts) == 2
+
+
+@macos_speech
 def test_transcribe_tool_flags_spoken_injection(db, spoken_injection, monkeypatch):
     monkeypatch.setattr(whatsapp, "download_media", lambda message_id, chat_jid: spoken_injection)
     out = main.transcribe_audio("AUDIO1", "5511@s.whatsapp.net")

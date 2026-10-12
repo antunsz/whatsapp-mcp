@@ -5,7 +5,9 @@ transcribe.swift is compiled into bin/transcribe on first use and again
 whenever the source changes.
 """
 import os
+import shutil
 import subprocess
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOURCE = os.path.join(HERE, "transcribe.swift")
@@ -26,9 +28,29 @@ def _helper() -> str:
     return BINARY
 
 
-def transcribe_file(path: str) -> str:
-    """Transcribe an audio file and return its text."""
+def _run(path: str) -> str:
     result = subprocess.run([_helper(), path, LOCALE], capture_output=True, text=True, timeout=600)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"transcriber exited with {result.returncode}")
     return result.stdout.strip()
+
+
+def transcribe_file(path: str) -> str:
+    """Transcribe an audio file and return its text.
+
+    macOS reads WhatsApp's Ogg/Opus directly but fails on some of those files
+    ("nilError"), so a failure is retried on a WAV copy decoded by ffmpeg.
+    """
+    try:
+        return _run(path)
+    except RuntimeError:
+        if not shutil.which("ffmpeg"):
+            raise
+    with tempfile.TemporaryDirectory() as tmp:
+        wav = os.path.join(tmp, "audio.wav")
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-i", path, "-ar", "16000", "-ac", "1", wav],
+            check=True,
+            capture_output=True,
+        )
+        return _run(wav)
