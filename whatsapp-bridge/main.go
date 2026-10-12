@@ -647,6 +647,15 @@ func downloadMedia(client *whatsmeow.Client, messageStore *MessageStore, message
 
 	// Download the media using whatsmeow client
 	mediaData, err := client.Download(context.Background(), downloader)
+	if isExpiredMedia(err) {
+		// WhatsApp dropped the file from its servers; the phone may still have it
+		var retryErr error
+		if mediaData, retryErr = downloadFromPhone(client, messageStore, downloader, messageID, chatJID); retryErr != nil {
+			err = fmt.Errorf("%v, and asking the phone for it failed: %v", err, retryErr)
+		} else {
+			err = nil
+		}
+	}
 	if err != nil {
 		return false, "", "", "", fmt.Errorf("failed to download media: %v", err)
 	}
@@ -855,6 +864,10 @@ func main() {
 		case *events.HistorySync:
 			// Process history sync events
 			handleHistorySync(client, messageStore, v, logger)
+
+		case *events.MediaRetry:
+			// The phone's answer to a request to upload expired media again
+			handleMediaRetry(v)
 
 		case *events.Connected:
 			logger.Infof("Connected to WhatsApp")
