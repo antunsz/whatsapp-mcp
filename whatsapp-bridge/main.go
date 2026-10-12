@@ -411,12 +411,13 @@ func extractMediaInfo(msg *waProto.Message) (mediaType string, filename string, 
 
 // Handle regular incoming messages with media support
 func handleMessage(client *whatsmeow.Client, messageStore *MessageStore, msg *events.Message, logger waLog.Logger) {
-	// Save message to database
-	chatJID := msg.Info.Chat.String()
-	sender := msg.Info.Sender.User
+	// Save message to database, by phone number when WhatsApp addressed it by LID
+	chat := pnJID(client, msg.Info.Chat)
+	chatJID := chat.String()
+	sender := pnJID(client, msg.Info.Sender).User
 
 	// Get appropriate chat name (pass nil for conversation since we don't have one for regular messages)
-	name := GetChatName(client, messageStore, msg.Info.Chat, chatJID, nil, sender, logger)
+	name := GetChatName(client, messageStore, chat, chatJID, nil, sender, logger)
 
 	// Update chat in database with the message timestamp (keeps last message time updated)
 	err := messageStore.StoreChat(chatJID, name, msg.Info.Timestamp)
@@ -563,7 +564,7 @@ func downloadMedia(client *whatsmeow.Client, messageStore *MessageStore, message
 	var err error
 
 	// First, check if we already have this file
-	chatDir := fmt.Sprintf("store/%s", strings.ReplaceAll(chatJID, ":", "_"))
+	chatDir := mediaDir(chatJID)
 	localPath := ""
 
 	// Get media info from the database
@@ -835,6 +836,15 @@ func main() {
 	}
 	defer messageStore.Close()
 
+	// Fold chats WhatsApp addressed by LID into the contacts' phone-number chats
+	toPN := func(jid types.JID) types.JID { return pnJID(client, jid) }
+	chatName := func(jid types.JID) string {
+		return GetChatName(client, messageStore, jid, jid.String(), nil, "", logger)
+	}
+	if err := mergeLIDChats(messageStore, toPN, chatName, logger); err != nil {
+		logger.Warnf("Failed to merge LID chats: %v", err)
+	}
+
 	// Setup event handling for messages and history sync
 	client.AddEventHandler(func(evt interface{}) {
 		switch v := evt.(type) {
@@ -1021,14 +1031,14 @@ func handleHistorySync(client *whatsmeow.Client, messageStore *MessageStore, his
 			continue
 		}
 
-		chatJID := *conversation.ID
-
 		// Try to parse the JID
-		jid, err := types.ParseJID(chatJID)
+		jid, err := types.ParseJID(*conversation.ID)
 		if err != nil {
-			logger.Warnf("Failed to parse JID %s: %v", chatJID, err)
+			logger.Warnf("Failed to parse JID %s: %v", *conversation.ID, err)
 			continue
 		}
+		jid = pnJID(client, jid)
+		chatJID := jid.String()
 
 		// Get appropriate chat name by passing the history sync conversation directly
 		name := GetChatName(client, messageStore, jid, chatJID, conversation, "", logger)
@@ -1094,6 +1104,9 @@ func handleHistorySync(client *whatsmeow.Client, messageStore *MessageStore, his
 					}
 					if !isFromMe && msg.Message.Key.Participant != nil && *msg.Message.Key.Participant != "" {
 						sender = *msg.Message.Key.Participant
+						if participant, err := types.ParseJID(sender); err == nil {
+							sender = pnJID(client, participant).String()
+						}
 					} else if isFromMe {
 						sender = client.Store.ID.User
 					} else {
