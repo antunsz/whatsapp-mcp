@@ -15,7 +15,8 @@ from whatsapp import (
     send_message as whatsapp_send_message,
     send_file as whatsapp_send_file,
     send_audio_message as whatsapp_audio_voice_message,
-    download_media as whatsapp_download_media
+    download_media as whatsapp_download_media,
+    transcribe_audio as whatsapp_transcribe_audio
 )
 
 # Initialize FastMCP server
@@ -311,6 +312,22 @@ def download_media(message_id: str, chat_jid: str) -> str:
             "success": False,
             "message": "Failed to download media"
         })
+
+@mcp.tool()
+def transcribe_audio(message_id: str, chat_jid: str) -> str:
+    """Transcribe a WhatsApp voice note to text, on this Mac (the audio never leaves the machine).
+
+    Audio messages show up in message lists as "[audio - Message ID: ... - Chat JID: ...]".
+    Transcriptions are cached, and message lists then show the text as "[audio, transcribed - ...]".
+
+    Args:
+        message_id: The ID of the audio message
+        chat_jid: The JID of the chat containing the message
+    """
+    success, text = whatsapp_transcribe_audio(message_id, chat_jid)
+    if success:
+        return guard({"success": True, "transcription": text})
+    return guard({"success": False, "message": text})
 
 if __name__ == "__main__":
     # Initialize and run the server

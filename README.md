@@ -160,6 +160,12 @@ You can send various media types to your WhatsApp contacts:
 
 By default, just the metadata of the media is stored in the local database. The message will indicate that media was sent. To access this media you need to use the download_media tool which takes the `message_id` and `chat_jid` (which are shown when printing messages containing the meda), this downloads the media and then returns the file path which can be then opened or passed to another tool.
 
+## Voice-note transcription
+
+`transcribe_audio` turns a voice note into text with macOS's on-device speech recognizer (SpeechAnalyzer, macOS 26 or later), so the audio never leaves your Mac and there is nothing to pay or install beyond the Xcode command line tools. The recognizer is only reachable from Swift: `whatsapp-mcp-server/transcribe.swift` is compiled into `whatsapp-mcp-server/bin/transcribe` on first use, which takes a second or two. A minute of audio takes about a second to transcribe.
+
+Transcriptions are cached in a `transcriptions` table in `messages.db`, and message lists then show `[audio, transcribed - ...]` followed by the text instead of the bare `[audio - ...]` placeholder. They go through the prompt-injection guard like any other message, since an injection can be spoken as easily as typed. Older audios may fail to download once WhatsApp drops them from its servers.
+
 ## Prompt-injection guard
 
 Message text, contact names and group names are written by other people, so the MCP server treats them as untrusted (see `whatsapp-mcp-server/guard.py`):
@@ -176,6 +182,7 @@ Environment variables:
 | --- | --- | --- |
 | `WHATSAPP_BRIDGE_PORT` | `8080` | Port of the bridge REST API, read by both the bridge and the MCP server. The API listens on `127.0.0.1` only. |
 | `WHATSAPP_SEND_ALLOWLIST` | empty | Comma-separated phone numbers or JIDs that can be sent to without confirmation, e.g. your own number. |
+| `WHATSAPP_TRANSCRIBE_LOCALE` | `pt_BR` | Language of voice notes, e.g. `en_US`. |
 
 Run the tests with `uv run pytest` inside `whatsapp-mcp-server`.
 
