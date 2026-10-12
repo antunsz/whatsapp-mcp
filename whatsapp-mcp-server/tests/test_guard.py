@@ -236,3 +236,10 @@ async def test_file_send_shows_resolved_path(sent, tmp_path):
     )
     assert result["success"]
     assert seen[0].endswith(f"File:\n{os.path.realpath(photo)}")
+
+
+async def test_confirmation_names_the_recipient_from_the_database(db, monkeypatch):
+    monkeypatch.setattr(main, "whatsapp_send_message", lambda r, m: (True, "sent"))
+    seen = []
+    await call("send_message", {"recipient": "5511", "message": "oi"}, answer("decline", seen=seen))
+    assert seen[0].startswith("Send on WhatsApp to João (5511@s.whatsapp.net)?")

@@ -337,15 +337,17 @@ def list_chats(
         conn = sqlite3.connect(MESSAGES_DB_PATH)
         cursor = conn.cursor()
         
-        # Build base query
-        query_parts = ["""
+        # Build base query; without the messages join the last-message columns are NULL
+        last_message = (
+            "messages.content, messages.sender, messages.is_from_me"
+            if include_last_message else "NULL, NULL, NULL"
+        )
+        query_parts = [f"""
             SELECT 
                 chats.jid,
                 chats.name,
                 chats.last_message_time,
-                messages.content as last_message,
-                messages.sender as last_sender,
-                messages.is_from_me as last_is_from_me
+                {last_message}
             FROM chats
         """]
         
@@ -547,14 +549,14 @@ def get_chat(chat_jid: str, include_last_message: bool = True) -> Optional[Chat]
         conn = sqlite3.connect(MESSAGES_DB_PATH)
         cursor = conn.cursor()
         
-        query = """
+        # Without the messages join the last-message columns are NULL
+        last_message = "m.content, m.sender, m.is_from_me" if include_last_message else "NULL, NULL, NULL"
+        query = f"""
             SELECT 
                 c.jid,
                 c.name,
                 c.last_message_time,
-                m.content as last_message,
-                m.sender as last_sender,
-                m.is_from_me as last_is_from_me
+                {last_message}
             FROM chats c
         """
         
