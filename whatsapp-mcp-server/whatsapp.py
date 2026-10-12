@@ -6,6 +6,7 @@ import os.path
 import requests
 import json
 import audio
+from guard import mark
 
 MESSAGES_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'whatsapp-bridge', 'store', 'messages.db')
 WHATSAPP_API_BASE_URL = f"http://localhost:{os.environ.get('WHATSAPP_BRIDGE_PORT', '8080')}/api"
@@ -96,7 +97,7 @@ def format_message(message: Message, show_chat_info: bool = True) -> None:
     output = ""
     
     if show_chat_info and message.chat_name:
-        output += f"[{message.timestamp:%Y-%m-%d %H:%M:%S}] Chat: {message.chat_name} "
+        output += f"[{message.timestamp:%Y-%m-%d %H:%M:%S}] Chat: {mark(message.chat_name)} "
     else:
         output += f"[{message.timestamp:%Y-%m-%d %H:%M:%S}] "
         
@@ -105,8 +106,8 @@ def format_message(message: Message, show_chat_info: bool = True) -> None:
         content_prefix = f"[{message.media_type} - Message ID: {message.id} - Chat JID: {message.chat_jid}] "
     
     try:
-        sender_name = get_sender_name(message.sender) if not message.is_from_me else "Me"
-        output += f"From: {sender_name}: {content_prefix}{message.content}\n"
+        sender_name = mark(get_sender_name(message.sender)) if not message.is_from_me else "Me"
+        output += f"From: {sender_name}: {content_prefix}{mark(message.content)}\n"
     except Exception as e:
         print(f"Error formatting message: {e}")
     return output

@@ -13,6 +13,7 @@ Here's an example of what you can do when it's connected to Claude.
 > To get updates on this and other projects I work on [enter your email here](https://docs.google.com/forms/d/1rTF9wMBTN0vPfzWuQa2BjfGKdKIpTbyeKxhPMcEzgyI/preview)
 
 > *Caution:* as with many MCP servers, the WhatsApp MCP is subject to [the lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/). This means that project injection could lead to private data exfiltration.
+> This fork adds a [prompt-injection guard](#prompt-injection-guard) that requires your confirmation for every send.
 
 ## Installation
 
@@ -158,6 +159,25 @@ You can send various media types to your WhatsApp contacts:
 #### Media Downloading
 
 By default, just the metadata of the media is stored in the local database. The message will indicate that media was sent. To access this media you need to use the download_media tool which takes the `message_id` and `chat_jid` (which are shown when printing messages containing the meda), this downloads the media and then returns the file path which can be then opened or passed to another tool.
+
+## Prompt-injection guard
+
+Message text, contact names and group names are written by other people, so the MCP server treats them as untrusted (see `whatsapp-mcp-server/guard.py`):
+
+- **Read tools** strip invisible characters (Unicode tag characters and bidi overrides can hide instructions from you while the model still reads them), prefix anything that looks like an injection with `⚠[possible prompt injection: <reasons>]`, and wrap the result between `whatsapp_data` markers with a random boundary and a notice that it is data, not instructions.
+- **Sends** (`send_message`, `send_file`, `send_audio_message`) ask you to approve the recipient and the exact content through MCP elicitation, which the model cannot answer for you. If the client does not support elicitation, the send is refused. Outgoing text is stripped of invisible characters, so what you approve is what is sent.
+- **Files** in hidden folders (`~/.ssh`, `~/.aws`, `.env`, ...), in `~/Library`, and key, credential or database files (including the bridge's own `whatsapp.db`, which holds the session keys) are never sent, even if approved.
+
+Detection is heuristic and can be bypassed; the confirmation on sends is the control that matters.
+
+Environment variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `WHATSAPP_BRIDGE_PORT` | `8080` | Port of the bridge REST API, read by both the bridge and the MCP server. The API listens on `127.0.0.1` only. |
+| `WHATSAPP_SEND_ALLOWLIST` | empty | Comma-separated phone numbers or JIDs that can be sent to without confirmation, e.g. your own number. |
+
+Run the tests with `uv run pytest` inside `whatsapp-mcp-server`.
 
 ## Technical Details
 
